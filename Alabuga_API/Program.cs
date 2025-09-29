@@ -1,23 +1,43 @@
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using Alabuga_API.Models;
+using Alabuga_API.Persistens;
+using Alabuga_API.Persistens.Repositories;
+using Alabuga_API.Persistens.Repositories.Interfaces;
+using Alabuga_API.Services;
+using Alabuga_API.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 
-builder.Services.AddAuthentication().AddJwtBearer(options => options.TokenValidationParameters = new TokenValidationParameters
-{
-    ValidateAudience = false,
-    ValidateIssuerSigningKey = true,
-    ValidIssuer = "http://localhost:7048",
-    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("asdwafatw"))
-});
+// JWT Init
+builder.Services.AddAuthentication().AddJwtBearer(options => options.TokenValidationParameters =
+    new TokenValidationParameters
+    {
+        ValidateAudience = false,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = "http://localhost:7048",
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("asdwafatw"))
+    });
 builder.Services.AddAuthorization();
+
+// DB
+builder.Services.AddDbContext<AlabugaContext>(
+    options =>
+    {
+        
+    }
+);
+
+// Dependency Injection
+// --Repositories
+builder.Services.AddScoped<IUserRepository, UserReposiotry>();
+
+// --Services
+builder.Services.AddScoped<IJwtService, JwtService>();
 
 
 builder.Services.AddSwaggerGen(c =>
@@ -31,15 +51,15 @@ builder.Services.AddSwaggerGen(c =>
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
-        new OpenApiSecurityScheme
-        {
-            Reference = new OpenApiReference
+            new OpenApiSecurityScheme
             {
-                Id = "Bearer",
-                Type = ReferenceType.SecurityScheme
-            }
-        },
-        new string[] {}
+                Reference = new OpenApiReference
+                {
+                    Id = "Bearer",
+                    Type = ReferenceType.SecurityScheme
+                }
+            },
+            new string[] { }
         }
     });
 });

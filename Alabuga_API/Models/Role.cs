@@ -11,5 +11,5 @@ public partial class Role
 
     public virtual ICollection<Region> Regions { get; set; } = new List<Region>();
 
-    public virtual ICollection<User> Users { get; set; } = new List<User>();
+    public virtual ICollection<User.User> Users { get; set; } = new List<User.User>();
 }

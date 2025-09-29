@@ -1,8 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Alabuga_API.Models;
+using Alabuga_API.Models.User;
 using Microsoft.EntityFrameworkCore;
 
-namespace Alabuga_API.Models;
+namespace Alabuga_API.Persistens;
 
 public partial class AlabugaContext : DbContext
 {

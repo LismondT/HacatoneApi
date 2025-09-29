@@ -13,5 +13,5 @@ public partial class Region
 
     public virtual Role FkCountryNavigation { get; set; } = null!;
 
-    public virtual ICollection<User> Users { get; set; } = new List<User>();
+    public virtual ICollection<User.User> Users { get; set; } = new List<User.User>();
 }

@@ -9,5 +9,5 @@ public partial class Country
 
     public string Name { get; set; } = null!;
 
-    public virtual ICollection<User> Users { get; set; } = new List<User>();
+    public virtual ICollection<User.User> Users { get; set; } = new List<User.User>();
 }

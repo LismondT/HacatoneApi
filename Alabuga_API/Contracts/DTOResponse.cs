@@ -1,4 +1,4 @@
-﻿namespace Alabuga_API.Models
+﻿namespace Alabuga_API.Contracts
 {
     public class DTOResponse<T>
     {

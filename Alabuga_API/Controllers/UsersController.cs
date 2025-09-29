@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
+﻿using Alabuga_API.Contracts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Alabuga_API.Models;
+using Alabuga_API.Models.User;
+using Alabuga_API.Persistens;
 
 namespace Alabuga_API.Controllers
 {

@@ -27,5 +27,5 @@ public partial class Rank
 
     public virtual ICollection<SkillRequirement> SkillRequirements { get; set; } = new List<SkillRequirement>();
 
-    public virtual ICollection<User> Users { get; set; } = new List<User>();
+    public virtual ICollection<User.User> Users { get; set; } = new List<User.User>();
 }
