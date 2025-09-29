@@ -1,12 +1,11 @@
 {
   "Version": 1,
-  "Hash": "02w+o5J9ONaLcf871RhCuUpJonhxyYDi/Gy5lTrevJU=",
+  "Hash": "fm81sMiiic8BL3CTUwkvgdE01Q1X1oeCSc/1uQ8/yT0=",
   "Source": "Alabuga_API",
   "BasePath": "_content/Alabuga_API",
   "Mode": "Default",
   "ManifestType": "Build",
   "ReferencedProjectsConfiguration": [],
   "DiscoveryPatterns": [],
-  "Assets": [],
-  "Endpoints": []
+  "Assets": []
 }

@@ -1,12 +1,12 @@
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
-using Alabuga_API.Models;
 using Alabuga_API.Persistens;
 using Alabuga_API.Persistens.Repositories;
 using Alabuga_API.Persistens.Repositories.Interfaces;
 using Alabuga_API.Services;
 using Alabuga_API.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,19 +26,17 @@ builder.Services.AddAuthorization();
 
 // DB
 builder.Services.AddDbContext<AlabugaContext>(
-    options =>
-    {
-        
-    }
+    options => { options.UseSqlite("Data Source=Alabuga.db"); }
 );
 
 // Dependency Injection
 // --Repositories
 builder.Services.AddScoped<IUserRepository, UserReposiotry>();
+builder.Services.AddScoped<IMissionsRepository, MissionsRepository>();
 
 // --Services
 builder.Services.AddScoped<IJwtService, JwtService>();
-
+builder.Services.AddScoped<IMissionsService, MissionsService>();
 
 builder.Services.AddSwaggerGen(c =>
 {

@@ -4,60 +4,57 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Alabuga_API.Persistens;
 
-public partial class AlabugaContext : DbContext
+public sealed partial class AlabugaContext : DbContext
 {
-    public AlabugaContext()
-    {
-    }
-
     public AlabugaContext(DbContextOptions<AlabugaContext> options)
         : base(options)
     {
+        Database.EnsureCreated();
     }
 
-    public virtual DbSet<Artifact> Artifacts { get; set; }
+    public DbSet<Artifact> Artifacts { get; set; }
 
-    public virtual DbSet<ArtifactLoot> ArtifactLoots { get; set; }
+    public DbSet<ArtifactLoot> ArtifactLoots { get; set; }
 
-    public virtual DbSet<Branch> Branches { get; set; }
+    public DbSet<Branch> Branches { get; set; }
 
-    public virtual DbSet<Category> Categories { get; set; }
+    public DbSet<Category> Categories { get; set; }
 
-    public virtual DbSet<Country> Countries { get; set; }
+    public DbSet<Country> Countries { get; set; }
 
-    public virtual DbSet<Difficult> Difficults { get; set; }
+    public DbSet<Difficult> Difficults { get; set; }
 
-    public virtual DbSet<Mission> Missions { get; set; }
+    public DbSet<Mission> Missions { get; set; }
 
-    public virtual DbSet<MissionRequirement> MissionRequirements { get; set; }
+    public DbSet<MissionRequirement> MissionRequirements { get; set; }
 
-    public virtual DbSet<Product> Products { get; set; }
+    public DbSet<Product> Products { get; set; }
 
-    public virtual DbSet<Rank> Ranks { get; set; }
+    public DbSet<Rank> Ranks { get; set; }
 
-    public virtual DbSet<Rare> Rares { get; set; }
+    public DbSet<Rare> Rares { get; set; }
 
-    public virtual DbSet<Region> Regions { get; set; }
+    public DbSet<Region> Regions { get; set; }
 
-    public virtual DbSet<Role> Roles { get; set; }
+    public DbSet<Role> Roles { get; set; }
 
-    public virtual DbSet<Skill> Skills { get; set; }
+    public DbSet<Skill> Skills { get; set; }
 
-    public virtual DbSet<SkillImprovement> SkillImprovements { get; set; }
+    public DbSet<SkillImprovement> SkillImprovements { get; set; }
 
-    public virtual DbSet<SkillRequirement> SkillRequirements { get; set; }
+    public DbSet<SkillRequirement> SkillRequirements { get; set; }
 
-    public virtual DbSet<User> Users { get; set; }
+    public DbSet<User> Users { get; set; }
 
-    public virtual DbSet<UserArtifact> UserArtifacts { get; set; }
+    public DbSet<UserArtifact> UserArtifacts { get; set; }
 
-    public virtual DbSet<UserMission> UserMissions { get; set; }
+    public DbSet<UserMission> UserMissions { get; set; }
 
-    public virtual DbSet<UserPurchase> UserPurchases { get; set; }
+    public DbSet<UserPurchase> UserPurchases { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseNpgsql("Host=localhost;Port=5433;Database=Alabuga;Username=postgres;Password=12345");
+//     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+// #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+//         => optionsBuilder.UseNpgsql("Host=localhost;Port=5433;Database=Alabuga;Username=postgres;Password=12345");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

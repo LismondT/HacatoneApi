@@ -1,0 +1,1510 @@
+ 
+======================================== 
+File: Alabuga_API\Program.cs 
+======================================== 
+ 
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Text;
+using Alabuga_API.Models;
+using Alabuga_API.Persistens;
+using Alabuga_API.Persistens.Repositories;
+using Alabuga_API.Persistens.Repositories.Interfaces;
+using Alabuga_API.Services;
+using Alabuga_API.Services.Interfaces;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+
+// JWT Init
+builder.Services.AddAuthentication().AddJwtBearer(options => options.TokenValidationParameters =
+    new TokenValidationParameters
+    {
+        ValidateAudience = false,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = "http://localhost:7048",
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("asdwafatw"))
+    });
+builder.Services.AddAuthorization();
+
+// DB
+builder.Services.AddDbContext<AlabugaContext>(
+    options =>
+    {
+        
+    }
+);
+
+// Dependency Injection
+// --Repositories
+builder.Services.AddScoped<IUserRepository, UserReposiotry>();
+
+// --Services
+builder.Services.AddScoped<IJwtService, JwtService>();
+
+
+builder.Services.AddSwaggerGen(c =>
+{
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        In = ParameterLocation.Header,
+        Scheme = "bearer",
+        Type = SecuritySchemeType.Http
+    });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Id = "Bearer",
+                    Type = ReferenceType.SecurityScheme
+                }
+            },
+            new string[] { }
+        }
+    });
+});
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run(); 
+ 
+======================================== 
+File: Alabuga_API\Contracts\DTOResponse.cs 
+======================================== 
+ 
+﻿namespace Alabuga_API.Contracts
+{
+    public class DTOResponse<T>
+    {
+        public string StatusCode { get; set; }
+        public T Data { get; set; }
+
+        public DTOResponse(string statusCode, T data)
+        {
+            StatusCode = statusCode;
+            Data = data;
+        }
+    }
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Contracts\Auth\SignInResponse.cs 
+======================================== 
+ 
+namespace Alabuga_API.Contracts.Auth;
+
+public record SignInResponse(
+    string AccessToken
+); 
+ 
+======================================== 
+File: Alabuga_API\Controllers\AuthController.cs 
+======================================== 
+ 
+﻿using Microsoft.AspNetCore.Mvc;
+using Alabuga_API.Contracts.Auth;
+using Alabuga_API.Models.User;
+using Alabuga_API.Persistens.Repositories.Interfaces;
+using Alabuga_API.Services.Interfaces;
+
+
+namespace Alabuga_API.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class AuthController(IUserRepository userRepository, IJwtService jwtService) : ControllerBase
+    {
+        // private readonly AlabugaContext _context = new AlabugaContext();
+        // private readonly JwtService _jwtService = new JwtService();
+
+        // На фронте у нас нет авторизации по email и паролю,
+        // вход через кнопку "Вход через Алабуга",
+        // для упрощения берётся рандомный пользователь 
+        [HttpPost]
+        public async Task<IActionResult> SignIn()
+        {
+            //var existingUser = _context.Users.FirstOrDefault(u => u.EMail == user.EMail && u.Password == user.Password);
+            User? existingUser = await userRepository.GetRandom();
+            if (existingUser == null)
+                return Unauthorized();
+            //new DTOResponse<string>(StatusCodes.Status401Unauthorized.ToString(), null);
+
+            string accessToken = jwtService.GenerateAccessToken(existingUser);
+            SignInResponse response = new(
+                AccessToken: accessToken
+            );
+
+            return Ok(response);
+        }
+    }
+} 
+ 
+======================================== 
+File: Alabuga_API\Controllers\UsersController.cs 
+======================================== 
+ 
+﻿using Alabuga_API.Contracts;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Alabuga_API.Models;
+using Alabuga_API.Models.User;
+using Alabuga_API.Persistens;
+
+namespace Alabuga_API.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class UsersController : ControllerBase
+    {
+        private readonly AlabugaContext _context = new AlabugaContext();
+
+        // GET: api/Users
+        [HttpGet]
+        public async Task<ActionResult<DTOResponse<List<User>>>> GetUsers()
+        {
+            List<User> users = await _context.Users.ToListAsync();
+            DTOResponse<List<User>> response = new DTOResponse<List<User>>(StatusCodes.Status200OK.ToString(), users);
+            return response;
+        }
+
+        // GET: api/Users/5
+        [HttpGet("{id}")]
+        public async Task<ActionResult<User>> GetUser(int id)
+        {
+            var user = await _context.Users.FindAsync(id);
+
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            return user;
+        }
+
+        // PUT: api/Users/5
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutUser(int id, User user)
+        {
+            if (id != user.Id)
+            {
+                return BadRequest();
+            }
+
+            _context.Entry(user).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!UserExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
+        }
+
+        // POST: api/Users
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [HttpPost]
+        public async Task<ActionResult<User>> PostUser(User user)
+        {
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction("GetUser", new { id = user.Id }, user);
+        }
+
+        // DELETE: api/Users/5
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteUser(int id)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        private bool UserExists(int id)
+        {
+            return _context.Users.Any(e => e.Id == id);
+        }
+    }
+} 
+ 
+======================================== 
+File: Alabuga_API\Models\Artifact.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+using Alabuga_API.Models.User;
+
+namespace Alabuga_API.Models;
+
+public partial class Artifact
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = null!;
+
+    public string Image { get; set; } = null!;
+
+    public string? Description { get; set; }
+
+    public int FkRare { get; set; }
+
+    public string? Lore { get; set; }
+
+    public virtual ICollection<ArtifactLoot> ArtifactLoots { get; set; } = new List<ArtifactLoot>();
+
+    public virtual Rare FkRareNavigation { get; set; } = null!;
+
+    public virtual ICollection<UserArtifact> UserArtifacts { get; set; } = new List<UserArtifact>();
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\ArtifactLoot.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+
+namespace Alabuga_API.Models;
+
+public partial class ArtifactLoot
+{
+    public int Id { get; set; }
+
+    public int FkArtifact { get; set; }
+
+    public int FkMission { get; set; }
+
+    public virtual Artifact FkArtifactNavigation { get; set; } = null!;
+
+    public virtual Mission FkMissionNavigation { get; set; } = null!;
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\Branch.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+
+namespace Alabuga_API.Models;
+
+public partial class Branch
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = null!;
+
+    public string? Description { get; set; }
+
+    public virtual ICollection<Mission> Missions { get; set; } = new List<Mission>();
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\Category.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+
+namespace Alabuga_API.Models;
+
+public partial class Category
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = null!;
+
+    public string? Description { get; set; }
+
+    public virtual ICollection<Mission> Missions { get; set; } = new List<Mission>();
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\Country.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+
+namespace Alabuga_API.Models;
+
+public partial class Country
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = null!;
+
+    public virtual ICollection<User.User> Users { get; set; } = new List<User.User>();
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\Difficult.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+
+namespace Alabuga_API.Models;
+
+public partial class Difficult
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = null!;
+
+    public string? Description { get; set; }
+
+    public virtual ICollection<Mission> Missions { get; set; } = new List<Mission>();
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\Mission.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+
+namespace Alabuga_API.Models;
+
+public partial class Mission
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = null!;
+
+    public string? Image { get; set; }
+
+    public string? Description { get; set; }
+
+    public int FkRank { get; set; }
+
+    public int Expirience { get; set; }
+
+    public int Energy { get; set; }
+
+    public int FkCategory { get; set; }
+
+    public bool Online { get; set; }
+
+    public bool Relevant { get; set; }
+
+    public bool NeedFile { get; set; }
+
+    public int FkBranch { get; set; }
+
+    public int FkDifficult { get; set; }
+
+    public string? Lore { get; set; }
+
+    public virtual ICollection<ArtifactLoot> ArtifactLoots { get; set; } = new List<ArtifactLoot>();
+
+    public virtual Branch FkBranchNavigation { get; set; } = null!;
+
+    public virtual Category FkCategoryNavigation { get; set; } = null!;
+
+    public virtual Difficult FkDifficultNavigation { get; set; } = null!;
+
+    public virtual Rank FkRankNavigation { get; set; } = null!;
+
+    public virtual ICollection<MissionRequirement> MissionRequirements { get; set; } = new List<MissionRequirement>();
+
+    public virtual ICollection<SkillImprovement> SkillImprovements { get; set; } = new List<SkillImprovement>();
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\MissionRequirement.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+
+namespace Alabuga_API.Models;
+
+public partial class MissionRequirement
+{
+    public int Id { get; set; }
+
+    public int FkRank { get; set; }
+
+    public int FkMission { get; set; }
+
+    public virtual Mission FkMissionNavigation { get; set; } = null!;
+
+    public virtual Rank FkRankNavigation { get; set; } = null!;
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\Product.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+using Alabuga_API.Models.User;
+
+namespace Alabuga_API.Models;
+
+public partial class Product
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = null!;
+
+    public string Image { get; set; } = null!;
+
+    public string? Description { get; set; }
+
+    public string Price { get; set; } = null!;
+
+    public int MaximumCountBuy { get; set; }
+
+    public int FkRank { get; set; }
+
+    public virtual Rank FkRankNavigation { get; set; } = null!;
+
+    public virtual ICollection<UserPurchase> UserPurchases { get; set; } = new List<UserPurchase>();
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\Rank.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+
+namespace Alabuga_API.Models;
+
+public partial class Rank
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = null!;
+
+    public string Image { get; set; } = null!;
+
+    public int MinimumExpirience { get; set; }
+
+    public int? FkRank { get; set; }
+
+    public virtual Rank? FkRankNavigation { get; set; }
+
+    public virtual ICollection<Rank> InverseFkRankNavigation { get; set; } = new List<Rank>();
+
+    public virtual ICollection<MissionRequirement> MissionRequirements { get; set; } = new List<MissionRequirement>();
+
+    public virtual ICollection<Mission> Missions { get; set; } = new List<Mission>();
+
+    public virtual ICollection<Product> Products { get; set; } = new List<Product>();
+
+    public virtual ICollection<SkillRequirement> SkillRequirements { get; set; } = new List<SkillRequirement>();
+
+    public virtual ICollection<User.User> Users { get; set; } = new List<User.User>();
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\Rare.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+
+namespace Alabuga_API.Models;
+
+public partial class Rare
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = null!;
+
+    public string? Description { get; set; }
+
+    public virtual ICollection<Artifact> Artifacts { get; set; } = new List<Artifact>();
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\Region.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+
+namespace Alabuga_API.Models;
+
+public partial class Region
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = null!;
+
+    public int FkCountry { get; set; }
+
+    public virtual Role FkCountryNavigation { get; set; } = null!;
+
+    public virtual ICollection<User.User> Users { get; set; } = new List<User.User>();
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\Role.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+
+namespace Alabuga_API.Models;
+
+public partial class Role
+{
+    public int Id { get; set; }
+
+    public List<string> Name { get; set; } = null!;
+
+    public virtual ICollection<Region> Regions { get; set; } = new List<Region>();
+
+    public virtual ICollection<User.User> Users { get; set; } = new List<User.User>();
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\Skill.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+
+namespace Alabuga_API.Models;
+
+public partial class Skill
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = null!;
+
+    public string? Description { get; set; }
+
+    public virtual ICollection<SkillImprovement> SkillImprovements { get; set; } = new List<SkillImprovement>();
+
+    public virtual ICollection<SkillRequirement> SkillRequirements { get; set; } = new List<SkillRequirement>();
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\SkillImprovement.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+
+namespace Alabuga_API.Models;
+
+public partial class SkillImprovement
+{
+    public int Id { get; set; }
+
+    public int FkMission { get; set; }
+
+    public int FkSkill { get; set; }
+
+    public int Expirience { get; set; }
+
+    public virtual Mission FkMissionNavigation { get; set; } = null!;
+
+    public virtual Skill FkSkillNavigation { get; set; } = null!;
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\SkillRequirement.cs 
+======================================== 
+ 
+﻿using System;
+using System.Collections.Generic;
+
+namespace Alabuga_API.Models;
+
+public partial class SkillRequirement
+{
+    public int Id { get; set; }
+
+    public int FkRank { get; set; }
+
+    public int FkSkill { get; set; }
+
+    public int MinimumExpirience { get; set; }
+
+    public virtual Rank FkRankNavigation { get; set; } = null!;
+
+    public virtual Skill FkSkillNavigation { get; set; } = null!;
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\Auth\RefreshToken.cs 
+======================================== 
+ 
+namespace Alabuga_API.Models.Auth;
+
+public record RefreshToken(
+    DateTime Expires,
+    string Token = ""
+)
+{
+    public bool IsExpired => DateTime.UtcNow >= Expires;
+    public static RefreshToken Create(string token, DateTime expires) =>
+        new(expires, token);
+}; 
+ 
+======================================== 
+File: Alabuga_API\Models\User\User.cs 
+======================================== 
+ 
+﻿namespace Alabuga_API.Models.User;
+
+public partial class User
+{
+    public int Id { get; set; }
+
+    public string EMail { get; set; } = null!;
+
+    public string? Phone { get; set; }
+
+    public string Password { get; set; } = null!;
+
+    public string FirstName { get; set; } = null!;
+
+    public string Name { get; set; } = null!;
+
+    public string? Patronymic { get; set; }
+
+    public DateOnly Birthdate { get; set; }
+
+    public string Sex { get; set; } = null!;
+
+    public int FkCountry { get; set; }
+
+    public string Place { get; set; } = null!;
+
+    public string? Photo { get; set; }
+
+    public string? Resume { get; set; }
+
+    public int? Energy { get; set; }
+
+    public int? Expirience { get; set; }
+
+    public int FkRank { get; set; }
+
+    public string? Direction { get; set; }
+
+    public int FkRole { get; set; }
+
+    public int FkRegion { get; set; }
+
+    public virtual Country FkCountryNavigation { get; set; } = null!;
+
+    public virtual Rank FkRankNavigation { get; set; } = null!;
+
+    public virtual Region FkRegionNavigation { get; set; } = null!;
+
+    public virtual Role FkRoleNavigation { get; set; } = null!;
+
+    public virtual ICollection<UserArtifact> UserArtifacts { get; set; } = new List<UserArtifact>();
+
+    public virtual ICollection<UserPurchase> UserPurchases { get; set; } = new List<UserPurchase>();
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\User\UserArtifact.cs 
+======================================== 
+ 
+﻿namespace Alabuga_API.Models.User;
+
+public partial class UserArtifact
+{
+    public int Id { get; set; }
+
+    public int FkUser { get; set; }
+
+    public int FkArtifact { get; set; }
+
+    public virtual Artifact FkArtifactNavigation { get; set; } = null!;
+
+    public virtual User FkUserNavigation { get; set; } = null!;
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\User\UserMission.cs 
+======================================== 
+ 
+﻿namespace Alabuga_API.Models.User;
+
+public partial class UserMission
+{
+    public int Id { get; set; }
+
+    public int FkUser { get; set; }
+
+    public int FkMission { get; set; }
+
+    public DateOnly Date { get; set; }
+
+    public string Result { get; set; } = null!;
+
+    public string? File { get; set; }
+
+    public bool Done { get; set; }
+
+    public virtual Mission FkMissionNavigation { get; set; } = null!;
+
+    public virtual User FkUserNavigation { get; set; } = null!;
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Models\User\UserPurchase.cs 
+======================================== 
+ 
+﻿namespace Alabuga_API.Models.User;
+
+public partial class UserPurchase
+{
+    public int Id { get; set; }
+
+    public int FkUser { get; set; }
+
+    public int FkProduct { get; set; }
+
+    public int Count { get; set; }
+
+    public DateOnly Date { get; set; }
+
+    public virtual Product FkProductNavigation { get; set; } = null!;
+
+    public virtual User FkUserNavigation { get; set; } = null!;
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\obj\Debug\net8.0\.NETCoreApp,Version=v8.0.AssemblyAttributes.cs 
+======================================== 
+ 
+// <autogenerated />
+using System;
+using System.Reflection;
+[assembly: global::System.Runtime.Versioning.TargetFrameworkAttribute(".NETCoreApp,Version=v8.0", FrameworkDisplayName = ".NET 8.0")]
+ 
+ 
+======================================== 
+File: Alabuga_API\obj\Debug\net8.0\Alabuga_API.AssemblyInfo.cs 
+======================================== 
+ 
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     Этот код создан программой.
+//     Исполняемая версия:4.0.30319.42000
+//
+//     Изменения в этом файле могут привести к неправильной работе и будут потеряны в случае
+//     повторной генерации кода.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+using System;
+using System.Reflection;
+
+[assembly: System.Reflection.AssemblyCompanyAttribute("Alabuga_API")]
+[assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyProductAttribute("Alabuga_API")]
+[assembly: System.Reflection.AssemblyTitleAttribute("Alabuga_API")]
+[assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
+
+// Создано классом WriteCodeFragment MSBuild.
+
+ 
+ 
+======================================== 
+File: Alabuga_API\obj\Debug\net8.0\Alabuga_API.GlobalUsings.g.cs 
+======================================== 
+ 
+// <auto-generated/>
+global using global::Microsoft.AspNetCore.Builder;
+global using global::Microsoft.AspNetCore.Hosting;
+global using global::Microsoft.AspNetCore.Http;
+global using global::Microsoft.AspNetCore.Routing;
+global using global::Microsoft.Extensions.Configuration;
+global using global::Microsoft.Extensions.DependencyInjection;
+global using global::Microsoft.Extensions.Hosting;
+global using global::Microsoft.Extensions.Logging;
+global using global::System;
+global using global::System.Collections.Generic;
+global using global::System.IO;
+global using global::System.Linq;
+global using global::System.Net.Http;
+global using global::System.Net.Http.Json;
+global using global::System.Threading;
+global using global::System.Threading.Tasks;
+ 
+ 
+======================================== 
+File: Alabuga_API\obj\Debug\net8.0\Alabuga_API.MvcApplicationPartsAssemblyInfo.cs 
+======================================== 
+ 
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     Этот код создан программой.
+//     Исполняемая версия:4.0.30319.42000
+//
+//     Изменения в этом файле могут привести к неправильной работе и будут потеряны в случае
+//     повторной генерации кода.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+using System;
+using System.Reflection;
+
+[assembly: Microsoft.AspNetCore.Mvc.ApplicationParts.ApplicationPartAttribute("Swashbuckle.AspNetCore.SwaggerGen")]
+
+// Создано классом WriteCodeFragment MSBuild.
+
+ 
+ 
+======================================== 
+File: Alabuga_API\Persistens\AlabugaContext.cs 
+======================================== 
+ 
+﻿using Alabuga_API.Models;
+using Alabuga_API.Models.User;
+using Microsoft.EntityFrameworkCore;
+
+namespace Alabuga_API.Persistens;
+
+public partial class AlabugaContext : DbContext
+{
+    public AlabugaContext()
+    {
+    }
+
+    public AlabugaContext(DbContextOptions<AlabugaContext> options)
+        : base(options)
+    {
+    }
+
+    public virtual DbSet<Artifact> Artifacts { get; set; }
+
+    public virtual DbSet<ArtifactLoot> ArtifactLoots { get; set; }
+
+    public virtual DbSet<Branch> Branches { get; set; }
+
+    public virtual DbSet<Category> Categories { get; set; }
+
+    public virtual DbSet<Country> Countries { get; set; }
+
+    public virtual DbSet<Difficult> Difficults { get; set; }
+
+    public virtual DbSet<Mission> Missions { get; set; }
+
+    public virtual DbSet<MissionRequirement> MissionRequirements { get; set; }
+
+    public virtual DbSet<Product> Products { get; set; }
+
+    public virtual DbSet<Rank> Ranks { get; set; }
+
+    public virtual DbSet<Rare> Rares { get; set; }
+
+    public virtual DbSet<Region> Regions { get; set; }
+
+    public virtual DbSet<Role> Roles { get; set; }
+
+    public virtual DbSet<Skill> Skills { get; set; }
+
+    public virtual DbSet<SkillImprovement> SkillImprovements { get; set; }
+
+    public virtual DbSet<SkillRequirement> SkillRequirements { get; set; }
+
+    public virtual DbSet<User> Users { get; set; }
+
+    public virtual DbSet<UserArtifact> UserArtifacts { get; set; }
+
+    public virtual DbSet<UserMission> UserMissions { get; set; }
+
+    public virtual DbSet<UserPurchase> UserPurchases { get; set; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+        => optionsBuilder.UseNpgsql("Host=localhost;Port=5433;Database=Alabuga;Username=postgres;Password=12345");
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Artifact>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Artifact_pkey");
+
+            entity.ToTable("Artifact");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.Description).HasColumnType("character varying");
+            entity.Property(e => e.FkRare).HasColumnName("FK_Rare");
+            entity.Property(e => e.Image).HasColumnType("character varying");
+            entity.Property(e => e.Lore).HasColumnType("character varying");
+            entity.Property(e => e.Name).HasColumnType("character varying");
+
+            entity.HasOne(d => d.FkRareNavigation).WithMany(p => p.Artifacts)
+                .HasForeignKey(d => d.FkRare)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Rare");
+        });
+
+        modelBuilder.Entity<ArtifactLoot>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Artifact_loot_pkey");
+
+            entity.ToTable("Artifact_loot");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.FkArtifact).HasColumnName("FK_Artifact");
+            entity.Property(e => e.FkMission).HasColumnName("FK_Mission");
+
+            entity.HasOne(d => d.FkArtifactNavigation).WithMany(p => p.ArtifactLoots)
+                .HasForeignKey(d => d.FkArtifact)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Artifact");
+
+            entity.HasOne(d => d.FkMissionNavigation).WithMany(p => p.ArtifactLoots)
+                .HasForeignKey(d => d.FkMission)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Mission");
+        });
+
+        modelBuilder.Entity<Branch>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Branch_pkey");
+
+            entity.ToTable("Branch");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.Description).HasColumnType("character varying");
+            entity.Property(e => e.Name).HasColumnType("character varying");
+        });
+
+        modelBuilder.Entity<Category>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Category_pkey");
+
+            entity.ToTable("Category");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.Description).HasColumnType("character varying");
+            entity.Property(e => e.Name).HasColumnType("character varying");
+        });
+
+        modelBuilder.Entity<Country>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Country_pkey");
+
+            entity.ToTable("Country");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.Name).HasColumnType("character varying");
+        });
+
+        modelBuilder.Entity<Difficult>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Difficult_pkey");
+
+            entity.ToTable("Difficult");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.Description).HasColumnType("character varying");
+            entity.Property(e => e.Name).HasColumnType("character varying");
+        });
+
+        modelBuilder.Entity<Mission>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Mission_pkey");
+
+            entity.ToTable("Mission");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.Description).HasColumnType("character varying");
+            entity.Property(e => e.FkBranch).HasColumnName("FK_Branch");
+            entity.Property(e => e.FkCategory).HasColumnName("FK_Category");
+            entity.Property(e => e.FkDifficult).HasColumnName("FK_Difficult");
+            entity.Property(e => e.FkRank).HasColumnName("FK_Rank");
+            entity.Property(e => e.Image).HasColumnType("character varying");
+            entity.Property(e => e.Lore).HasColumnType("character varying");
+            entity.Property(e => e.Name).HasColumnType("character varying");
+            entity.Property(e => e.NeedFile).HasColumnName("Need_file");
+
+            entity.HasOne(d => d.FkBranchNavigation).WithMany(p => p.Missions)
+                .HasForeignKey(d => d.FkBranch)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Branch");
+
+            entity.HasOne(d => d.FkCategoryNavigation).WithMany(p => p.Missions)
+                .HasForeignKey(d => d.FkCategory)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Category");
+
+            entity.HasOne(d => d.FkDifficultNavigation).WithMany(p => p.Missions)
+                .HasForeignKey(d => d.FkDifficult)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Difficult");
+
+            entity.HasOne(d => d.FkRankNavigation).WithMany(p => p.Missions)
+                .HasForeignKey(d => d.FkRank)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Rank");
+        });
+
+        modelBuilder.Entity<MissionRequirement>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Mission_requirement_pkey");
+
+            entity.ToTable("Mission_requirement");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.FkMission).HasColumnName("FK_Mission");
+            entity.Property(e => e.FkRank).HasColumnName("FK_Rank");
+
+            entity.HasOne(d => d.FkMissionNavigation).WithMany(p => p.MissionRequirements)
+                .HasForeignKey(d => d.FkMission)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Mission");
+
+            entity.HasOne(d => d.FkRankNavigation).WithMany(p => p.MissionRequirements)
+                .HasForeignKey(d => d.FkRank)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Rank");
+        });
+
+        modelBuilder.Entity<Product>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Product_pkey");
+
+            entity.ToTable("Product");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.Description).HasColumnType("character varying");
+            entity.Property(e => e.FkRank).HasColumnName("FK_Rank");
+            entity.Property(e => e.Image).HasColumnType("character varying");
+            entity.Property(e => e.MaximumCountBuy).HasColumnName("Maximum_count_buy");
+            entity.Property(e => e.Name).HasColumnType("character varying");
+            entity.Property(e => e.Price).HasColumnType("character varying");
+
+            entity.HasOne(d => d.FkRankNavigation).WithMany(p => p.Products)
+                .HasForeignKey(d => d.FkRank)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Rank");
+        });
+
+        modelBuilder.Entity<Rank>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Rank_pkey");
+
+            entity.ToTable("Rank");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.FkRank).HasColumnName("FK_Rank");
+            entity.Property(e => e.Image).HasColumnType("character varying");
+            entity.Property(e => e.MinimumExpirience).HasColumnName("Minimum_expirience");
+            entity.Property(e => e.Name).HasColumnType("character varying");
+
+            entity.HasOne(d => d.FkRankNavigation).WithMany(p => p.InverseFkRankNavigation)
+                .HasForeignKey(d => d.FkRank)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_Rank");
+        });
+
+        modelBuilder.Entity<Rare>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Rare_pkey");
+
+            entity.ToTable("Rare");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.Description).HasColumnType("character varying");
+            entity.Property(e => e.Name).HasColumnType("character varying");
+        });
+
+        modelBuilder.Entity<Region>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Region_pkey");
+
+            entity.ToTable("Region");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.FkCountry).HasColumnName("FK_Country");
+            entity.Property(e => e.Name).HasColumnType("character varying");
+
+            entity.HasOne(d => d.FkCountryNavigation).WithMany(p => p.Regions)
+                .HasForeignKey(d => d.FkCountry)
+                .HasConstraintName("FK_Country");
+        });
+
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Role_pkey");
+
+            entity.ToTable("Role");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.Name).HasColumnType("character varying[]");
+        });
+
+        modelBuilder.Entity<Skill>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Skill_pkey");
+
+            entity.ToTable("Skill");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.Description).HasColumnType("character varying");
+            entity.Property(e => e.Name).HasColumnType("character varying");
+        });
+
+        modelBuilder.Entity<SkillImprovement>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Skill_improvement_pkey");
+
+            entity.ToTable("Skill_improvement");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.FkMission).HasColumnName("FK_Mission");
+            entity.Property(e => e.FkSkill).HasColumnName("FK_Skill");
+
+            entity.HasOne(d => d.FkMissionNavigation).WithMany(p => p.SkillImprovements)
+                .HasForeignKey(d => d.FkMission)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Mission");
+
+            entity.HasOne(d => d.FkSkillNavigation).WithMany(p => p.SkillImprovements)
+                .HasForeignKey(d => d.FkSkill)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Skill");
+        });
+
+        modelBuilder.Entity<SkillRequirement>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("Skill_requirement_pkey");
+
+            entity.ToTable("Skill_requirement");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.FkRank).HasColumnName("FK_Rank");
+            entity.Property(e => e.FkSkill).HasColumnName("FK_Skill");
+            entity.Property(e => e.MinimumExpirience).HasColumnName("Minimum_expirience");
+
+            entity.HasOne(d => d.FkRankNavigation).WithMany(p => p.SkillRequirements)
+                .HasForeignKey(d => d.FkRank)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Rank");
+
+            entity.HasOne(d => d.FkSkillNavigation).WithMany(p => p.SkillRequirements)
+                .HasForeignKey(d => d.FkSkill)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Skill");
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("User_pkey");
+
+            entity.ToTable("User");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.Direction).HasColumnType("character varying");
+            entity.Property(e => e.EMail)
+                .HasColumnType("character varying")
+                .HasColumnName("E-mail");
+            entity.Property(e => e.FirstName)
+                .HasColumnType("character varying")
+                .HasColumnName("First_name");
+            entity.Property(e => e.FkCountry).HasColumnName("FK_Country");
+            entity.Property(e => e.FkRank).HasColumnName("FK_Rank");
+            entity.Property(e => e.FkRegion).HasColumnName("FK_Region");
+            entity.Property(e => e.FkRole).HasColumnName("FK_Role");
+            entity.Property(e => e.Name).HasColumnType("character varying");
+            entity.Property(e => e.Password).HasColumnType("character varying");
+            entity.Property(e => e.Patronymic).HasColumnType("character varying");
+            entity.Property(e => e.Phone).HasColumnType("character varying");
+            entity.Property(e => e.Photo).HasColumnType("character varying");
+            entity.Property(e => e.Place).HasColumnType("character varying");
+            entity.Property(e => e.Resume).HasColumnType("character varying");
+            entity.Property(e => e.Sex).HasColumnType("character varying");
+
+            entity.HasOne(d => d.FkCountryNavigation).WithMany(p => p.Users)
+                .HasForeignKey(d => d.FkCountry)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Country");
+
+            entity.HasOne(d => d.FkRankNavigation).WithMany(p => p.Users)
+                .HasForeignKey(d => d.FkRank)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Rank");
+
+            entity.HasOne(d => d.FkRegionNavigation).WithMany(p => p.Users)
+                .HasForeignKey(d => d.FkRegion)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Region");
+
+            entity.HasOne(d => d.FkRoleNavigation).WithMany(p => p.Users)
+                .HasForeignKey(d => d.FkRole)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Role");
+        });
+
+        modelBuilder.Entity<UserArtifact>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("User_artifact_pkey");
+
+            entity.ToTable("User_artifact");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.FkArtifact).HasColumnName("FK_Artifact");
+            entity.Property(e => e.FkUser).HasColumnName("FK_User");
+
+            entity.HasOne(d => d.FkArtifactNavigation).WithMany(p => p.UserArtifacts)
+                .HasForeignKey(d => d.FkArtifact)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Artifact");
+
+            entity.HasOne(d => d.FkUserNavigation).WithMany(p => p.UserArtifacts)
+                .HasForeignKey(d => d.FkUser)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_User");
+        });
+
+        modelBuilder.Entity<UserMission>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("User_mission");
+
+            entity.Property(e => e.File).HasColumnType("character varying");
+            entity.Property(e => e.FkMission).HasColumnName("FK_Mission");
+            entity.Property(e => e.FkUser).HasColumnName("FK_User");
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.Result).HasColumnType("character varying");
+
+            entity.HasOne(d => d.FkMissionNavigation).WithMany()
+                .HasForeignKey(d => d.FkMission)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Mission");
+
+            entity.HasOne(d => d.FkUserNavigation).WithMany()
+                .HasForeignKey(d => d.FkUser)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_User");
+        });
+
+        modelBuilder.Entity<UserPurchase>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("User_purchases_pkey");
+
+            entity.ToTable("User_purchases");
+
+            entity.Property(e => e.Id)
+                .UseIdentityAlwaysColumn()
+                .HasColumnName("ID");
+            entity.Property(e => e.FkProduct).HasColumnName("FK_Product");
+            entity.Property(e => e.FkUser).HasColumnName("FK_User");
+
+            entity.HasOne(d => d.FkProductNavigation).WithMany(p => p.UserPurchases)
+                .HasForeignKey(d => d.FkProduct)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Product");
+
+            entity.HasOne(d => d.FkUserNavigation).WithMany(p => p.UserPurchases)
+                .HasForeignKey(d => d.FkUser)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_User");
+        });
+
+        OnModelCreatingPartial(modelBuilder);
+    }
+
+    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Persistens\Repositories\UserReposiotry.cs 
+======================================== 
+ 
+using Alabuga_API.Models.User;
+using Alabuga_API.Persistens.Repositories.Interfaces;
+using Microsoft.EntityFrameworkCore;
+
+namespace Alabuga_API.Persistens.Repositories;
+
+public class UserReposiotry(AlabugaContext context) : IUserRepository
+{
+    public async Task<User?> GetRandom()
+    {
+        int count = await context.Users.AsNoTracking().CountAsync();
+
+        if (count == 0)
+            return null;
+
+        Random random = new();
+        int skip = random.Next(0, count);
+
+        return await context.Users
+            .AsNoTracking()
+            .Skip(skip)
+            .FirstOrDefaultAsync();
+    }
+} 
+ 
+======================================== 
+File: Alabuga_API\Persistens\Repositories\Interfaces\IUserRepository.cs 
+======================================== 
+ 
+using Alabuga_API.Models.User;
+
+namespace Alabuga_API.Persistens.Repositories.Interfaces;
+
+public interface IUserRepository
+{
+    Task<User?> GetRandom();
+} 
+ 
+======================================== 
+File: Alabuga_API\Services\JwtService.cs 
+======================================== 
+ 
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Alabuga_API.Models.Auth;
+using Alabuga_API.Models.User;
+using Alabuga_API.Services.Interfaces;
+using Microsoft.IdentityModel.Tokens;
+
+namespace Alabuga_API.Services
+{
+    public class JwtService : IJwtService
+    {
+        public string GenerateAccessToken(User user)
+        {
+            SymmetricSecurityKey securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("asdmakmcboaragb"));
+            SigningCredentials credetianals = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+            var claims = new[] { new Claim(ClaimTypes.Name, user.Name) };
+
+            JwtSecurityToken token = new JwtSecurityToken("http://localhost:7048", null, claims, expires: DateTime.Now.AddMinutes(15), signingCredentials: credetianals);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        public RefreshToken GenerateRefreshToken()
+        {
+            throw new NotImplementedException();
+        }
+    }
+}
+ 
+ 
+======================================== 
+File: Alabuga_API\Services\Interfaces\IJwtService.cs 
+======================================== 
+ 
+using Alabuga_API.Models;
+using Alabuga_API.Models.Auth;
+using Alabuga_API.Models.User;
+
+namespace Alabuga_API.Services.Interfaces;
+
+public interface IJwtService
+{
+    public string GenerateAccessToken(User user);
+    public RefreshToken GenerateRefreshToken();
+} 

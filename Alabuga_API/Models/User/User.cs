@@ -4,6 +4,8 @@ public partial class User
 {
     public int Id { get; set; }
 
+    public string AccessToken { get; set; } = null;
+    
     public string EMail { get; set; } = null!;
 
     public string? Phone { get; set; }
