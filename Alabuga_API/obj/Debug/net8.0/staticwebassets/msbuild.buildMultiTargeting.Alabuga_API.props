@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\Alabuga_API.props" />
+</Project>
