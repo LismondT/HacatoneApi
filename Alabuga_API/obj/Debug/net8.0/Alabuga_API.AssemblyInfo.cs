@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Alabuga_API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3001333910b767ef6aae25c3d6dc982164f4906d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5781538f5559f9599e6cf664a49517aa75439155")]
 [assembly: System.Reflection.AssemblyProductAttribute("Alabuga_API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Alabuga_API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

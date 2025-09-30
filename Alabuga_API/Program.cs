@@ -1,9 +1,10 @@
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using Alabuga_API.Middleware;
 using Alabuga_API.Persistens;
-using Alabuga_API.Persistens.Repositories;
 using Alabuga_API.Persistens.Repositories.Interfaces;
+using Alabuga_API.Persistens.Repositories;
 using Alabuga_API.Services;
 using Alabuga_API.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -14,14 +15,29 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
 // JWT Init
-builder.Services.AddAuthentication().AddJwtBearer(options => options.TokenValidationParameters =
-    new TokenValidationParameters
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = "JWT";
+    options.DefaultChallengeScheme = "JWT";
+})
+.AddJwtBearer("JWT", options => 
+{
+    options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateAudience = false,
         ValidateIssuerSigningKey = true,
         ValidIssuer = "http://localhost:7048",
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("asdwafatw"))
-    });
+    };
+})
+.AddCookie("Cookies", options =>
+{
+    options.Cookie.Name = "auth-token";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+});
+
 builder.Services.AddAuthorization();
 
 // DB
@@ -64,7 +80,6 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -73,7 +88,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<JwtCookieMiddleware>();
 
 app.MapControllers();
 

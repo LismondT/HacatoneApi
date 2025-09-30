@@ -18,7 +18,22 @@ public class UserReposiotry(AlabugaContext context) : IUserRepository
 
         return await context.Users
             .AsNoTracking()
+            .Include(u => u.FkRankNavigation)
             .Skip(skip)
             .FirstOrDefaultAsync();
+    }
+
+    public async Task<User?> GetByIdAsync(int id)
+    {
+        return await context.Users
+            .Include(u => u.FkRankNavigation)
+            .FirstOrDefaultAsync(u => u.Id == id);
+    }
+
+    public async Task<User?> GetByEmailAsync(string email)
+    {
+        return await context.Users
+            .Include(u => u.FkRankNavigation)
+            .FirstOrDefaultAsync(u => u.EMail == email);
     }
 }

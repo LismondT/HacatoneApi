@@ -6,25 +6,17 @@ namespace Alabuga_API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class MissionsController : ControllerBase
+public class MissionsController(
+    IMissionsRepository missionsRepository,
+    ILogger<MissionsController> logger)
+    : ControllerBase
 {
-    private readonly IMissionsRepository _missionsRepository;
-    private readonly ILogger<MissionsController> _logger;
-
-    public MissionsController(
-        IMissionsRepository missionsRepository,
-        ILogger<MissionsController> logger)
-    {
-        _missionsRepository = missionsRepository;
-        _logger = logger;
-    }
-
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
         try
         {
-            var missions = await _missionsRepository.GetAllAsync();
+            var missions = await missionsRepository.GetAllAsync();
             var missionData = missions.Select(ToMissionData).ToList();
 
             var response = new GetAllMissionsResponse(Missions: missionData);
@@ -32,7 +24,7 @@ public class MissionsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error occurred while getting all missions");
+            logger.LogError(ex, "Error occurred while getting all missions");
             return StatusCode(500, "An error occurred while retrieving missions");
         }
     }
@@ -42,15 +34,15 @@ public class MissionsController : ControllerBase
     {
         try
         {
-            var mission = await _missionsRepository.GetByIdAsync(id);
-            
+            var mission = await missionsRepository.GetByIdAsync(id);
+
             if (mission == null)
             {
                 return NotFound($"Mission with ID {id} not found");
             }
 
             var missionData = ToMissionData(mission);
-            
+
             var requirements = mission.MissionRequirements
                 .Select(mr => new MissionRequirementData(
                     RankName: mr.FkRankNavigation?.Name ?? "Unknown",
@@ -67,7 +59,7 @@ public class MissionsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error occurred while getting mission with ID {MissionId}", id);
+            logger.LogError(ex, "Error occurred while getting mission with ID {MissionId}", id);
             return StatusCode(500, "An error occurred while retrieving the mission");
         }
     }
@@ -77,7 +69,7 @@ public class MissionsController : ControllerBase
     {
         try
         {
-            var missions = await _missionsRepository.GetByCategoryAsync(categoryId);
+            var missions = await missionsRepository.GetByCategoryAsync(categoryId);
             var missionData = missions.Select(ToMissionData).ToList();
 
             var response = new GetAllMissionsResponse(Missions: missionData);
@@ -85,7 +77,7 @@ public class MissionsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error occurred while getting missions for category {CategoryId}", categoryId);
+            logger.LogError(ex, "Error occurred while getting missions for category {CategoryId}", categoryId);
             return StatusCode(500, "An error occurred while retrieving missions");
         }
     }
@@ -95,7 +87,7 @@ public class MissionsController : ControllerBase
     {
         try
         {
-            var missions = await _missionsRepository.GetByBranchAsync(branchId);
+            var missions = await missionsRepository.GetByBranchAsync(branchId);
             var missionData = missions.Select(ToMissionData).ToList();
 
             var response = new GetAllMissionsResponse(Missions: missionData);
@@ -103,7 +95,7 @@ public class MissionsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error occurred while getting missions for branch {BranchId}", branchId);
+            logger.LogError(ex, "Error occurred while getting missions for branch {BranchId}", branchId);
             return StatusCode(500, "An error occurred while retrieving missions");
         }
     }
@@ -113,7 +105,7 @@ public class MissionsController : ControllerBase
     {
         try
         {
-            var missions = await _missionsRepository.GetByDifficultyAsync(difficultyId);
+            var missions = await missionsRepository.GetByDifficultyAsync(difficultyId);
             var missionData = missions.Select(ToMissionData).ToList();
 
             var response = new GetAllMissionsResponse(Missions: missionData);
@@ -121,7 +113,7 @@ public class MissionsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error occurred while getting missions for difficulty {DifficultyId}", difficultyId);
+            logger.LogError(ex, "Error occurred while getting missions for difficulty {DifficultyId}", difficultyId);
             return StatusCode(500, "An error occurred while retrieving missions");
         }
     }
@@ -131,7 +123,7 @@ public class MissionsController : ControllerBase
     {
         try
         {
-            var missions = await _missionsRepository.GetOnlineMissionsAsync();
+            var missions = await missionsRepository.GetOnlineMissionsAsync();
             var missionData = missions.Select(ToMissionData).ToList();
 
             var response = new GetAllMissionsResponse(Missions: missionData);
@@ -139,7 +131,7 @@ public class MissionsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error occurred while getting online missions");
+            logger.LogError(ex, "Error occurred while getting online missions");
             return StatusCode(500, "An error occurred while retrieving missions");
         }
     }
@@ -149,7 +141,7 @@ public class MissionsController : ControllerBase
     {
         try
         {
-            var missions = await _missionsRepository.GetMissionsWithArtifactsAsync();
+            var missions = await missionsRepository.GetMissionsWithArtifactsAsync();
             var missionData = missions.Select(ToMissionData).ToList();
 
             var response = new GetAllMissionsResponse(Missions: missionData);
@@ -157,7 +149,7 @@ public class MissionsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error occurred while getting missions with artifacts");
+            logger.LogError(ex, "Error occurred while getting missions with artifacts");
             return StatusCode(500, "An error occurred while retrieving missions");
         }
     }
@@ -172,7 +164,7 @@ public class MissionsController : ControllerBase
             var userRankId = 1; // This should come from user service
             var userSkillIds = new List<int> { 1, 2, 3 }; // This should come from user service
 
-            var missions = await _missionsRepository.GetMissionsByRequirementsAsync(userRankId, userSkillIds);
+            var missions = await missionsRepository.GetMissionsByRequirementsAsync(userRankId, userSkillIds);
             var missionData = missions.Select(ToMissionData).ToList();
 
             var response = new GetAllMissionsResponse(Missions: missionData);
@@ -180,7 +172,7 @@ public class MissionsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error occurred while getting available missions for user {UserId}", userId);
+            logger.LogError(ex, "Error occurred while getting available missions for user {UserId}", userId);
             return StatusCode(500, "An error occurred while retrieving missions");
         }
     }
